@@ -251,21 +251,21 @@ class BasePage:
     # ------------------------------------------------------------------
     # 等待
     # ------------------------------------------------------------------
-    def wait_count(self, locator: Locator, expected: int,
-                   timeout: Optional[int] = None) -> None:
-        """轮询等待元素数量精确等于期望值"""
-        limit = (timeout or self.timeout["assertion"]) / 1000
-        waited = 0.0
-        while waited < limit:
-            if locator.count() == expected:
-                return
-            self.page.wait_for_timeout(200)
-            waited += 0.2
-        raise AssertionError(f"等待元素数量={expected} 超时，当前={locator.count()}")
-    # def wait_count(self, locator: Locator, expected: int, timeout: Optional[int] = None) -> None:
-    #     expect(locator).to_have_count(
-    #         expected, timeout=timeout or self.timeout["assertion"]
-    #     )
+    # def wait_count(self, locator: Locator, expected: int,
+    #                timeout: Optional[int] = None) -> None:
+    #     """轮询等待元素数量精确等于期望值"""
+    #     limit = (timeout or self.timeout["assertion"]) / 1000
+    #     waited = 0.0
+    #     while waited < limit:
+    #         if locator.count() == expected:
+    #             return
+    #         self.page.wait_for_timeout(200)
+    #         waited += 0.2
+    #     raise AssertionError(f"等待元素数量={expected} 超时，当前={locator.count()}")
+    def wait_count(self, locator: Locator, expected: int, timeout: Optional[int] = None) -> None:
+        expect(locator).to_have_count(
+            expected, timeout=timeout or self.timeout["assertion"]
+        )
 
     def wait_text_contains(self, locator: Locator, expected: str,
                            timeout: Optional[int] = None) -> None:
