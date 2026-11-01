@@ -138,48 +138,48 @@ class CartFlow:
     # ==================================================================
     # 加入购物车
     # ==================================================================
-    def add_to_cart(self, key_or_idp) -> str:
-        """在详情页点击 Add to cart，返回 alert 文案"""
-        p = settings.product(key_or_idp)
-        with step(f"加入购物车：{p['title']}（${p['price']}）"):
-            msg = self.product.add_to_cart()
-            self.ctx.setdefault("add_messages", []).append(msg)
-            attach_json("加购提示", {"product": p["title"], "alert": msg})
-        return msg
     # def add_to_cart(self, key_or_idp) -> str:
     #     """在详情页点击 Add to cart，返回 alert 文案"""
     #     p = settings.product(key_or_idp)
     #     with step(f"加入购物车：{p['title']}（${p['price']}）"):
     #         msg = self.product.add_to_cart()
-    #         if not msg:  # ① alert 没捕获到，立刻暴露
-    #             raise AssertionError(f"加购未捕获到 alert，商品：{p['title']}")
     #         self.ctx.setdefault("add_messages", []).append(msg)
-    #         attach_json("加购提示", {"product": p['title'], "alert": msg})
+    #         attach_json("加购提示", {"product": p["title"], "alert": msg})
     #     return msg
+    def add_to_cart(self, key_or_idp) -> str:
+        """在详情页点击 Add to cart，返回 alert 文案"""
+        p = settings.product(key_or_idp)
+        with step(f"加入购物车：{p['title']}（${p['price']}）"):
+            msg = self.product.add_to_cart()
+            if not msg:  # ① alert 没捕获到，立刻暴露
+                raise AssertionError(f"加购未捕获到 alert，商品：{p['title']}")
+            self.ctx.setdefault("add_messages", []).append(msg)
+            attach_json("加购提示", {"product": p['title'], "alert": msg})
+        return msg
 
     #
-    def add_to_cart_times(self, key_or_idp, times: int) -> List[str]:
-        p = settings.product(key_or_idp)
-        with step(f"连续加购 {times} 次：{p['title']}"):
-            msgs = self.product.add_to_cart_times(times)
-            attach_table("连续加购结果", ["次数", "alert 文案"],
-                         [[i + 1, m] for i, m in enumerate(msgs)])
-            self.ctx["add_messages"] = msgs
-        return msgs
     # def add_to_cart_times(self, key_or_idp, times: int) -> List[str]:
     #     p = settings.product(key_or_idp)
     #     with step(f"连续加购 {times} 次：{p['title']}"):
     #         msgs = self.product.add_to_cart_times(times)
-    #
-    #         missed = [i + 1 for i, m in enumerate(msgs) if not m]
-    #         if missed:  # ② 定位哪一次点击失效
-    #             raise AssertionError(
-    #                 f"第 {missed} 次加购未捕获到 alert（共 {times} 次），商品：{p['title']}")
-    #
-    #         self.ctx.setdefault("add_messages", []).extend(msgs)  # ③ 统一累积语义
     #         attach_table("连续加购结果", ["次数", "alert 文案"],
     #                      [[i + 1, m] for i, m in enumerate(msgs)])
+    #         self.ctx["add_messages"] = msgs
     #     return msgs
+    def add_to_cart_times(self, key_or_idp, times: int) -> List[str]:
+        p = settings.product(key_or_idp)
+        with step(f"连续加购 {times} 次：{p['title']}"):
+            msgs = self.product.add_to_cart_times(times)
+
+            missed = [i + 1 for i, m in enumerate(msgs) if not m]
+            if missed:  # ② 定位哪一次点击失效
+                raise AssertionError(
+                    f"第 {missed} 次加购未捕获到 alert（共 {times} 次），商品：{p['title']}")
+
+            self.ctx.setdefault("add_messages", []).extend(msgs)  # ③ 统一累积语义
+            attach_table("连续加购结果", ["次数", "alert 文案"],
+                         [[i + 1, m] for i, m in enumerate(msgs)])
+        return msgs
 
     def add_products(self, keys: List[str]) -> List[str]:
         """依次加购多个商品（每个商品都重新打开详情页，模拟真实路径）"""
