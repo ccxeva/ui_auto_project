@@ -1,0 +1,123 @@
+# ==============================================================================
+# DemoBlaze UI 自动化项目 - 全局配置
+# 说明：所有环境相关的可变参数集中在此，代码中禁止硬编码 URL / 账号 / 超时
+#       支持通过环境变量覆盖，便于 CI 多环境切换
+# ==============================================================================
+
+# ---------------------------- 被测环境 ----------------------------
+env: demo                        # 激活的环境标识，对应下方 environments 的 key
+
+environments:
+  demo:
+    name: "DemoBlaze 演示环境"
+    base_url: "https://www.demoblaze.com"
+    api_base_url: "https://api.demoblaze.com"
+  staging:
+    name: "预发布环境（占位，按需替换）"
+    base_url: "https://staging.demoblaze.com"
+    api_base_url: "https://api-staging.demoblaze.com"
+
+# ---------------------------- 浏览器 ----------------------------
+browser:
+  name: chromium                 # chromium / firefox / webkit
+  headed: false                  # 本地调试可改为 true
+  slow_mo: 0                     # 每步操作放慢毫秒数，调试用
+  viewport:
+    width: 1440
+    height: 900
+  locale: "en-US"
+  timezone_id: "Asia/Shanghai"
+  ignore_https_errors: true
+
+# ---------------------------- 超时（毫秒） ----------------------------
+timeout:
+  implicit: 30000                # 普通元素等待
+  navigation: 45000              # 页面导航
+  alert: 15000                   # alert 弹窗等待
+  assertion: 10000               # 断言轮询
+  cart_list: 25000               # 购物车列表渲染（/viewcart 逐条 append，数据多时较慢）
+  reload: 30000                  # 刷新后重新渲染
+
+# ---------------------------- 测试账号 ----------------------------
+accounts:
+  primary:                       # 主账号（用例中 login 步骤使用）
+    username: "yang zoe"
+    password: "yz123456"
+  secondary:                     # 副账号（多账号隔离场景使用）
+    username: "qa_user_b"
+    password: "qa123456"
+  auto_register: true            # 登录前若账号不存在则自动注册
+  register_password_hint: "接口侧密码需 Base64，前端自动处理"
+
+# ---------------------------- 业务常量 ----------------------------
+business:
+  # 商品信息与用例文档保持一致（取自 /bycat?cat=notebook 实时数据）
+  products:
+    sony_vaio_i5:
+      idp: 8
+      title: "Sony vaio i5"
+      price: 790
+    sony_vaio_i7:
+      idp: 9
+      title: "Sony vaio i7"
+      price: 790
+    macbook_air:
+      idp: 11
+      title: "MacBook air"
+      price: 700
+    dell_i7_8gb:
+      idp: 12
+      title: "Dell i7 8gb"
+      price: 700
+    dell_2017_15_6:
+      idp: 13
+      title: "2017 Dell 15.6 Inch"
+      price: 700
+    macbook_pro:
+      idp: 15
+      title: "MacBook Pro"
+      price: 1100
+
+  # 分类映射（UI 文案 -> 接口 cat 参数）
+  categories:
+    phones: "phone"
+    laptops: "notebook"
+    monitors: "monitor"
+
+  # 站点固定文案（断言基准，集中维护便于文案变更时统一调整）
+  texts:
+    add_to_cart_success: "Product added."
+    add_to_cart_success_guest: "Product added"
+    login_success_prefix: "Welcome"
+    item_deleted: "Item deleted."
+    item_not_found: "Not found."
+    token_malformed: "Bad parameter, token malformed."
+    user_not_exist: "User does not exist."
+    wrong_password: "Wrong password."
+    empty_login: "Please fill out Username and Password."
+
+  # 接口路径
+  api_paths:
+    login: "/login"
+    signup: "/signup"
+    check: "/check"
+    bycat: "/bycat"
+    view: "/view"
+    add_to_cart: "/addtocart"
+    view_cart: "/viewcart"
+    delete_item: "/deleteitem"
+
+# ---------------------------- 报告 ----------------------------
+report:
+  allure_results: "reports/allure-results"
+  allure_report: "reports/allure-report"
+  screenshot_on_failure: true
+  screenshot_on_success: false
+  attach_console_log: true
+  attach_network_log: true       # 附加关键接口请求/响应，便于报告内定位
+  attach_page_source_on_failure: true
+
+# ---------------------------- 数据驱动 ----------------------------
+data:
+  case_file: "data/cart_cases.yaml"     # 用例数据文件
+  marker: "@data"                        # YAML 中用例标记，仅执行带该标记的用例

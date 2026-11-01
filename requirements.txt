@@ -1,0 +1,34 @@
+# ==============================================================================
+# DemoBlaze 购物车 UI 自动化 - 依赖清单
+# Python >= 3.9（推荐 3.11）
+# 安装：pip install -r requirements.txt
+# 首次安装浏览器：playwright install chromium
+# ==============================================================================
+
+# --- 测试框架 ---
+pytest==8.3.4
+pytest-playwright==0.6.2
+
+# --- 浏览器驱动 ---
+playwright==1.49.1
+
+# --- 报告 ---
+allure-pytest==2.13.5
+# allure 命令行工具非 pip 包，需单独安装：
+#   macOS:   brew install allure
+#   Ubuntu:  sudo apt install default-jre && \
+#            wget https://github.com/allure-framework/allure2/releases/download/2.32.0/allure-2.32.0.tgz && \
+#            tar -zxvf allure-2.32.0.tgz -C /opt/ && ln -s /opt/allure-2.32.0/bin/allure /usr/bin/allure
+
+# --- 数据驱动与配置 ---
+PyYAML==6.0.2
+
+# --- 接口层（数据准备 / 三层断言交叉验证） ---
+requests==2.32.3
+
+# --- 可选：并行执行、重跑 ---
+pytest-xdist==3.6.1
+pytest-rerunfailures==15.0
+
+# --- 可选：报告美化 / 通知 ---
+pytest-html==4.1.1

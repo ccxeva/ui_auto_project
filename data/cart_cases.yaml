@@ -1,0 +1,938 @@
+# ==============================================================================
+# DemoBlaze 购物流程 UI 自动化用例数据（数据驱动）
+# 覆盖模块：
+#   1. 电商系统 → 购物车模块 → 加入购物车（MALL-CART-FUNC-0001 ~ 0013）
+#   2. 电商系统 → 购物车模块 → 删除记录  （MALL-CARTDEL-FUNC-0001 ~ 0012）
+#   3. 电商系统 → 主流程 → 登录到购物车删除（MALL-E2E-FUNC-0001 ~ 0006）
+# 说明：
+#   - 仅 marker 为 "@data" 的用例会被 pytest 参数化收集
+#   - 与用例文档逐条对应，id 保持一致，便于双向追溯
+#   - account: primary=主账号登录 / guest=游客态 / none=不涉及登录
+#   - 预期结果以断言 action 表达，可量化、可校验
+# ==============================================================================
+
+version: "1.0"
+marker: "@data"
+
+# ---------------------------- 全局变量 ----------------------------
+variables:
+  p_macbook_air: macbook_air        # $700
+  p_macbook_pro: macbook_pro        # $1100
+  p_dell_8gb: dell_i7_8gb           # $700
+  p_sony_i5: sony_vaio_i5           # $790
+  price_air: 700
+  price_pro: 1100
+  price_dell: 700
+  price_sony: 790
+
+# ---------------------------- 默认值 ----------------------------
+defaults:
+  marker: "@data"
+  account: primary
+  enabled: true
+  layer: UI
+  feature: "电商系统"
+  timeout_level: normal
+
+cases:
+
+  # ============================================================================
+  # 一、加入购物车
+  # ============================================================================
+  - id: MALL-CART-FUNC-0001
+    title: "已登录状态在详情页点击 Add to cart，验证加购成功提示"
+    module: "电商系统 → 购物车模块 → 加入购物车"
+    story: "加入购物车"
+    priority: P0
+    tags: [smoke, cart]
+    account: primary
+    precondition: "账号已注册并登录；购物车为空"
+    input: "商品 MacBook air（idp=11，$700）"
+    remark: "加购成功后不跳转购物车，停留详情页，弹窗文案含句号"
+    steps:
+      - action: open_site
+        desc: "打开首页"
+      - action: ensure_login
+        desc: "确保登录（接口校验账号 + UI 登录）"
+      - action: assert_logged_in
+        desc: "确认导航栏显示 Welcome"
+      - action: api_clear_cart
+        desc: "接口清空购物车，保证起点干净"
+      - action: open_product
+        product: ${p_macbook_air}
+        desc: "URL 直达 MacBook air 详情页"
+      - action: assert_product_detail
+        product: ${p_macbook_air}
+        desc: "详情页标题/价格与配置一致"
+      - action: add_to_cart
+        product: ${p_macbook_air}
+        desc: "点击 Add to cart"
+      - action: assert_add_success
+        guest: false
+        desc: "alert 文案含 Product added."
+      - action: assert_url_contains
+        part: "prod.html"
+        desc: "加购后仍停留详情页"
+      - action: assert_api_cart_count
+        expected: 1
+        desc: "接口侧落库 1 条"
+
+  - id: MALL-CART-FUNC-0002
+    title: "加购后进入购物车页面，验证商品记录正确新增"
+    module: "电商系统 → 购物车模块 → 加入购物车"
+    story: "加入购物车"
+    priority: P0
+    tags: [smoke, cart]
+    account: primary
+    precondition: "已登录；购物车为空"
+    input: "商品 MacBook air（$700）"
+    remark: "购物车每行 4 列：图片/标题/价格/Delete"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: open_product
+        product: ${p_macbook_air}
+      - action: add_to_cart
+        product: ${p_macbook_air}
+      - action: assert_add_success
+      - action: open_cart
+        expect_rows: 1
+        desc: "进入购物车并等待渲染出 1 行"
+      - action: assert_cart_count
+        expected: 1
+      - action: assert_cart_titles
+        expected: ["MacBook air"]
+      - action: assert_cart_prices
+        expected: ["${price_air}"]
+      - action: assert_cart_total
+        expected: ${price_air}
+
+  - id: MALL-CART-FUNC-0003
+    title: "未登录（游客）状态加购商品，验证游客购物车可正常使用"
+    module: "电商系统 → 购物车模块 → 加入购物车"
+    story: "加入购物车"
+    priority: P0
+    tags: [smoke, guest]
+    account: guest
+    precondition: "浏览器无 Cookie，处于未登录游客态"
+    input: "商品 Sony vaio i5（idp=8，$790）"
+    remark: "游客态加购 alert 文案为 Product added（无句号），数据按 Cookie 归属"
+    steps:
+      - action: open_site
+      - action: assert_guest
+        desc: "确认导航栏显示 LOG IN"
+      - action: open_product
+        product: ${p_sony_i5}
+      - action: add_to_cart
+        product: ${p_sony_i5}
+      - action: assert_add_success
+        guest: true
+        desc: "游客态文案为 Product added"
+      - action: open_cart
+        expect_rows: 1
+      - action: assert_cart_titles
+        expected: ["Sony vaio i5"]
+      - action: assert_cart_total
+        expected: ${price_sony}
+
+  - id: MALL-CART-FUNC-0004
+    title: "对同一商品连续加购三次，验证重复加购的记录生成策略"
+    module: "电商系统 → 购物车模块 → 加入购物车"
+    story: "加入购物车"
+    priority: P1
+    tags: [cart, regression]
+    account: primary
+    precondition: "已登录；购物车为空"
+    input: "商品 MacBook air 连续加购 3 次"
+    remark: "当前实现不去重，3 次点击生成 3 条独立记录，Total 累加为 2100（需与需求确认）"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: open_product
+        product: ${p_macbook_air}
+      - action: add_to_cart_times
+        product: ${p_macbook_air}
+        times: 3
+      - action: assert_dialog_count
+        expected: 3
+        desc: "3 次点击应产生 3 次 alert"
+      - action: open_cart
+        expect_rows: 3
+      - action: assert_cart_count
+        expected: 3
+      - action: assert_cart_total
+        expected: 2100
+        desc: "3 × 700，验证不去重时的金额累加"
+
+  - id: MALL-CART-FUNC-0005
+    title: "依次加购两个不同商品，验证购物车记录内容与金额汇总正确"
+    module: "电商系统 → 购物车模块 → 加入购物车"
+    story: "加入购物车"
+    priority: P0
+    tags: [smoke, cart]
+    account: primary
+    precondition: "已登录；购物车为空"
+    input: "先加 MacBook air（$700），再加 MacBook Pro（$1100）"
+    remark: "实测 /viewcart 返回顺序不稳定（同一脚本两次执行结果相反），故只断言内容与金额，不断言顺序"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: add_products
+        products: ["${p_macbook_air}", "${p_macbook_pro}"]
+      - action: open_cart
+        expect_rows: 2
+      - action: assert_cart_count
+        expected: 2
+      - action: assert_cart_titles
+        expected: ["MacBook air", "MacBook Pro"]
+        ordered: false
+        desc: "校验两件商品均存在（顺序由服务端返回，不具确定性）"
+      - action: assert_cart_prices
+        expected: ["${price_air}", "${price_pro}"]
+        ordered: false
+      - action: assert_cart_total
+        expected: 1800
+        desc: "总价 = 700 + 1100，与展示顺序无关"
+
+  - id: MALL-CART-FUNC-0006
+    title: "加购后刷新购物车页面，验证记录持久化不丢失"
+    module: "电商系统 → 购物车模块 → 加入购物车"
+    story: "加入购物车"
+    priority: P0
+    tags: [smoke, cart, persistence]
+    account: primary
+    precondition: "已登录；购物车为空"
+    input: "商品 MacBook air（$700）"
+    remark: "区分前端内存态与服务端持久化，刷新后仍应为 1 条"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: open_product
+        product: ${p_macbook_air}
+      - action: add_to_cart
+        product: ${p_macbook_air}
+      - action: open_cart
+        expect_rows: 1
+      - action: assert_cart_total
+        expected: ${price_air}
+      - action: refresh_cart
+        desc: "F5 刷新购物车"
+      - action: assert_cart_count
+        expected: 1
+      - action: assert_cart_total
+        expected: ${price_air}
+      - action: assert_api_cart_count
+        expected: 1
+
+  - id: MALL-CART-FUNC-0007
+    title: "校验加购数据落库，验证接口与 UI 数据一致"
+    module: "电商系统 → 购物车模块 → 加入购物车"
+    story: "加入购物车"
+    priority: P1
+    tags: [api, cart]
+    account: primary
+    precondition: "已登录；购物车为空"
+    input: "商品 MacBook air（prod_id=11）"
+    remark: "原用例为抓包校验 Payload，自动化改为接口层交叉验证，覆盖力度等价且更稳定"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: open_product
+        product: ${p_macbook_air}
+      - action: add_to_cart
+        product: ${p_macbook_air}
+      - action: api_cart_items
+      - action: assert_api_cart_count
+        expected: 1
+      - action: assert_api_contains_product
+        product: ${p_macbook_air}
+      - action: assert_api_total
+        expected: ${price_air}
+      - action: open_cart
+        expect_rows: 1
+      - action: assert_rows_equal_api
+        desc: "UI 行数 = 接口条数"
+
+  - id: MALL-CART-FUNC-0008
+    title: "快速连续点击 Add to cart，验证记录数与点击次数一致"
+    module: "电商系统 → 购物车模块 → 加入购物车"
+    story: "加入购物车"
+    priority: P2
+    tags: [cart, concurrency]
+    account: primary
+    precondition: "已登录；购物车为空"
+    input: "连续加购 2 次（模拟快速双击）"
+    remark: "alert 为阻塞式弹窗，Playwright 自动 accept；如记录数与点击次数不符需检查前端防抖"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: open_product
+        product: ${p_macbook_air}
+      - action: add_to_cart_times
+        product: ${p_macbook_air}
+        times: 2
+      - action: assert_dialog_count
+        expected: 2
+      - action: open_cart
+        expect_rows: 2
+      - action: assert_cart_total
+        expected: 1400
+
+  - id: MALL-CART-FUNC-0009
+    title: "游客加购后登录同一浏览器，验证登录态与游客购物车数据隔离"
+    module: "电商系统 → 购物车模块 → 加入购物车"
+    story: "加入购物车"
+    priority: P1
+    tags: [cart, isolation]
+    account: guest
+    precondition: "浏览器无 Cookie；购物车为空"
+    input: "游客加购 Sony vaio i5 后以主账号登录"
+    remark: "实测登录态与游客态数据互相独立；若需求要求合并购物车，需同步调整断言"
+    steps:
+      - action: open_site
+      - action: assert_guest
+      - action: open_product
+        product: ${p_sony_i5}
+      - action: add_to_cart
+        product: ${p_sony_i5}
+      - action: assert_add_success
+        guest: true
+      - action: open_cart
+        expect_rows: 1
+      - action: assert_cart_total
+        expected: ${price_sony}
+      - action: ensure_login
+        desc: "同一浏览器登录主账号"
+      - action: assert_logged_in
+      - action: api_clear_cart
+        desc: "清空登录态购物车，确保断言基准唯一"
+      - action: open_cart
+        expect_rows: 0
+        desc: "登录态购物车为空，不含游客商品"
+      - action: assert_cart_empty
+
+  - id: MALL-CART-FUNC-0010
+    title: "账号 A 加购后切换账号 B 登录，验证多账号购物车数据隔离"
+    module: "电商系统 → 购物车模块 → 加入购物车"
+    story: "加入购物车"
+    priority: P0
+    tags: [cart, isolation, smoke]
+    account: primary
+    precondition: "主账号可登录；副账号已注册；两者购物车为空"
+    input: "账号 A（yang zoe）加购 MacBook Pro；账号 B（qa_user_b）登录查看"
+    remark: "副账号若不存在会由接口自动注册；越权串号属 S2 缺陷"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: open_product
+        product: ${p_macbook_pro}
+      - action: add_to_cart
+        product: ${p_macbook_pro}
+      - action: open_cart
+        expect_rows: 1
+      - action: assert_cart_total
+        expected: ${price_pro}
+      - action: logout
+      - action: assert_guest
+      - action: login
+        username: qa_user_b
+        password: qa123456
+        desc: "切换账号 B 登录"
+      - action: assert_logged_in
+      - action: open_cart
+        expect_rows: 0
+        desc: "账号 B 购物车为空，不含 A 的商品"
+      - action: assert_cart_empty
+
+  - id: MALL-CART-FUNC-0011
+    title: "加购不同价格商品后核对购物车总计，验证金额计算正确"
+    module: "电商系统 → 购物车模块 → 加入购物车"
+    story: "加入购物车"
+    priority: P0
+    tags: [smoke, cart, amount]
+    account: primary
+    precondition: "已登录；购物车为空"
+    input: "MacBook air（700）+ MacBook Pro（1100）→ 1800；追加 Dell i7 8gb（700）→ 2500"
+    remark: "金额断言前去除 $ 与千分位，按数值比较"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: add_products
+        products: ["${p_macbook_air}", "${p_macbook_pro}"]
+      - action: open_cart
+        expect_rows: 2
+      - action: assert_cart_prices
+        expected: ["${price_air}", "${price_pro}"]
+      - action: assert_cart_total
+        expected: 1800
+      - action: refresh_cart
+      - action: assert_cart_total
+        expected: 1800
+        desc: "刷新后金额不变"
+      - action: add_products
+        products: ["${p_dell_8gb}"]
+      - action: open_cart
+        expect_rows: 3
+      - action: assert_cart_total
+        expected: 2500
+
+  - id: MALL-CART-FUNC-0012
+    title: "调用加购接口传入不存在的商品 ID，验证服务端商品有效性校验"
+    module: "电商系统 → 购物车模块 → 加入购物车"
+    story: "加入购物车"
+    priority: P1
+    tags: [api, defect]
+    account: primary
+    precondition: "已登录；已取得 token"
+    input: "prod_id=9999（不存在的商品）"
+    remark: "【缺陷复现用例】实测服务端未校验 prod_id 有效性，接口返回成功并写入脏数据；修复后需改为断言购物车条数不变"
+    skip: false
+    expect_fail: true
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: open_cart
+        expect_rows: 0
+      - action: add_invalid_product_api
+        prod_id: 9999
+        desc: "接口加购非法商品"
+      - action: assert_api_cart_count
+        expected: 0
+        desc: "【期望行为】非法商品不应写入购物车；实测为 1 条，属缺陷"
+
+  - id: MALL-CART-FUNC-0013
+    title: "使用伪造 Cookie 调用加购接口，验证接口鉴权拦截"
+    module: "电商系统 → 购物车模块 → 加入购物车"
+    story: "加入购物车"
+    priority: P1
+    tags: [api, security]
+    account: primary
+    precondition: "接口可访问"
+    input: "cookie=garbage_token_123（伪造）/ 空串"
+    remark: "实测返回 Bad parameter, token malformed.，不写入数据"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: add_to_cart_with_fake_token
+        cookie: "garbage_token_123"
+        desc: "伪造 token 加购"
+      - action: assert_fake_token_rejected
+        desc: "响应应为 token malformed"
+      - action: open_cart
+        expect_rows: 0
+      - action: assert_cart_empty
+        desc: "伪造 token 不得写入任何数据"
+
+  # ============================================================================
+  # 二、删除购物车记录
+  # ============================================================================
+  - id: MALL-CARTDEL-FUNC-0001
+    title: "购物车仅有 1 条记录时点击 Delete，验证记录删除成功"
+    module: "电商系统 → 购物车模块 → 删除记录"
+    story: "删除记录"
+    priority: P0
+    tags: [smoke, delete]
+    account: primary
+    precondition: "已登录；购物车含 MacBook air 1 条"
+    input: "点击该行 Delete"
+    remark: "删除接口参数为购物车条目 UUID，非商品 ID"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: add_to_cart_api
+        product: ${p_macbook_air}
+      - action: open_cart
+        expect_rows: 1
+      - action: delete_first
+      - action: assert_cart_empty
+
+  - id: MALL-CARTDEL-FUNC-0002
+    title: "购物车有 3 条记录时删除中间一条，验证仅目标记录被删除"
+    module: "电商系统 → 购物车模块 → 删除记录"
+    story: "删除记录"
+    priority: P0
+    tags: [smoke, delete]
+    account: primary
+    precondition: "已登录；购物车含 MacBook air、MacBook Pro、Dell i7 8gb 各 1 条"
+    input: "删除中间行 MacBook Pro（$1100）"
+    remark: "重点排查按索引删除导致的错删相邻行"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: add_products
+        products: ["${p_macbook_air}", "${p_macbook_pro}", "${p_dell_8gb}"]
+      - action: open_cart
+        expect_rows: 3
+      - action: assert_cart_total
+        expected: 2500
+      - action: delete_by_title
+        title: "MacBook Pro"
+      - action: assert_cart_count
+        expected: 2
+      - action: assert_row_deleted
+        title: "MacBook Pro"
+      - action: assert_row_kept
+        title: "MacBook air"
+      - action: assert_row_kept
+        title: "Dell i7 8gb"
+      - action: assert_cart_total
+        expected: 1400
+
+  - id: MALL-CARTDEL-FUNC-0003
+    title: "逐条删除购物车全部记录至空，验证全量清空与页面空态"
+    module: "电商系统 → 购物车模块 → 删除记录"
+    story: "删除记录"
+    priority: P0
+    tags: [smoke, delete]
+    account: primary
+    precondition: "已登录；购物车含 3 条不同商品"
+    input: "逐条点击 Delete 共 3 次"
+    remark: "空态允许保留表头，但不得出现残留空行或 undefined"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: add_products
+        products: ["${p_macbook_air}", "${p_macbook_pro}", "${p_dell_8gb}"]
+      - action: open_cart
+        expect_rows: 3
+      - action: delete_first
+      - action: assert_cart_count
+        expected: 2
+      - action: delete_first
+      - action: assert_cart_count
+        expected: 1
+      - action: delete_first
+      - action: assert_cart_empty
+      - action: refresh_cart
+      - action: assert_cart_empty
+        desc: "刷新后仍为空，未出现记录复活"
+
+  - id: MALL-CARTDEL-FUNC-0004
+    title: "删除高价商品后核对总计，验证金额实时重算"
+    module: "电商系统 → 购物车模块 → 删除记录"
+    story: "删除记录"
+    priority: P0
+    tags: [smoke, delete, amount]
+    account: primary
+    precondition: "已登录；购物车含 MacBook Pro（1100）+ MacBook air（700）"
+    input: "删除 MacBook Pro"
+    remark: "金额变化量应等于被删商品价格"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: add_products
+        products: ["${p_macbook_pro}", "${p_macbook_air}"]
+      - action: open_cart
+        expect_rows: 2
+      - action: assert_cart_total
+        expected: 1800
+      - action: delete_by_title
+        title: "MacBook Pro"
+      - action: assert_cart_total
+        expected: 700
+      - action: refresh_cart
+      - action: assert_cart_total
+        expected: 700
+        desc: "刷新后金额不被回滚"
+      - action: delete_first
+      - action: assert_cart_empty
+
+  - id: MALL-CARTDEL-FUNC-0005
+    title: "删除记录后刷新页面，验证删除结果已持久化到服务端"
+    module: "电商系统 → 购物车模块 → 删除记录"
+    story: "删除记录"
+    priority: P0
+    tags: [smoke, delete, persistence]
+    account: primary
+    precondition: "已登录；购物车含 MacBook air 与 MacBook Pro 各 1 条"
+    input: "删除 MacBook air"
+    remark: "区分假删除（仅前端移除）与真删除，需接口层二次确认"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: add_products
+        products: ["${p_macbook_air}", "${p_macbook_pro}"]
+      - action: open_cart
+        expect_rows: 2
+      - action: delete_by_title
+        title: "MacBook air"
+      - action: assert_cart_count
+        expected: 1
+      - action: refresh_cart
+      - action: assert_cart_count
+        expected: 1
+      - action: assert_row_kept
+        title: "MacBook Pro"
+      - action: assert_api_cart_count
+        expected: 1
+        desc: "接口侧确认已删除"
+
+  - id: MALL-CARTDEL-FUNC-0006
+    title: "重复提交已删除记录的删除请求，验证删除操作的幂等性"
+    module: "电商系统 → 购物车模块 → 删除记录"
+    story: "删除记录"
+    priority: P1
+    tags: [api, delete]
+    account: primary
+    precondition: "已登录；购物车含 1 条记录"
+    input: "先正常删除，再用同一条目 UUID 重放删除请求"
+    remark: "实测重放返回 Not found.，不误删其他记录"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: add_to_cart_api
+        product: ${p_macbook_air}
+      - action: api_cart_items
+      - action: replay_delete
+        desc: "接口删除并重放同一 id"
+      - action: assert_delete_idempotent
+        desc: "重放返回 Not found.，且购物车仍为空"
+
+  - id: MALL-CARTDEL-FUNC-0007
+    title: "在空购物车状态下访问购物车页面，验证空态处理"
+    module: "电商系统 → 购物车模块 → 删除记录"
+    story: "删除记录"
+    priority: P1
+    tags: [delete, ui]
+    account: primary
+    precondition: "已登录；购物车已清空"
+    input: "直接访问 cart.html"
+    remark: "空态 Total 为空串，不应出现 0 元商品行或 JS 报错"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: assert_api_cart_count
+        expected: 0
+      - action: open_cart
+        expect_rows: 0
+      - action: assert_cart_empty
+      - action: open_site
+        desc: "返回首页"
+      - action: open_cart
+        expect_rows: 0
+        desc: "再次进入购物车仍为空"
+
+  - id: MALL-CARTDEL-FUNC-0008
+    title: "调用删除接口传入不存在的记录 ID，验证服务端容错"
+    module: "电商系统 → 购物车模块 → 删除记录"
+    story: "删除记录"
+    priority: P1
+    tags: [api, delete]
+    account: primary
+    precondition: "已登录；购物车含 1 条真实记录"
+    input: "随机 UUID 作为删除 id，重复 3 次"
+    remark: "核心断言：非法 id 不得影响既有真实数据"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: add_to_cart_api
+        product: ${p_macbook_air}
+      - action: delete_not_exist_id
+        times: 3
+        desc: "删除不存在的记录 3 次"
+      - action: assert_not_found_response
+        desc: "响应应为 Not found."
+      - action: open_cart
+        expect_rows: 1
+        desc: "真实记录不得被误删"
+
+  - id: MALL-CARTDEL-FUNC-0009
+    title: "使用账号 A 的 token 删除账号 B 的购物车记录，验证越权保护"
+    module: "电商系统 → 购物车模块 → 删除记录"
+    story: "删除记录"
+    priority: P1
+    tags: [security, delete, defect]
+    account: primary
+    precondition: "主账号与副账号均已注册；副账号有 1 条记录"
+    input: "用 A 的 token + B 的条目 UUID 调用删除接口"
+    remark: "【缺陷复现用例】实测服务端未校验条目归属，A 可删除 B 的记录（S1 越权）；修复后此用例应转为通过"
+    skip: false
+    expect_fail: true
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: cross_account_delete
+        desc: "B 账号加购取 item_id，用 A 的 token 删除"
+      - action: assert_cross_account_protected
+        desc: "B 的记录仍存在，不越权删除"
+
+  - id: MALL-CARTDEL-FUNC-0010
+    title: "检查 Delete 链接的可点击性，验证点击命中区域与行为"
+    module: "电商系统 → 购物车模块 → 删除记录"
+    story: "删除记录"
+    priority: P2
+    tags: [delete, ui]
+    account: primary
+    precondition: "已登录；购物车含 2 条记录"
+    input: "点击第 1 行 Delete 链接"
+    remark: "Delete 为 a[href='#']，需关注光标样式与是否触发整行跳转"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: add_products
+        products: ["${p_macbook_air}", "${p_macbook_pro}"]
+      - action: open_cart
+        expect_rows: 2
+      - action: assert_delete_link_clickable
+        desc: "Delete 可见且光标为 pointer"
+      - action: delete_first
+      - action: assert_cart_count
+        expected: 1
+
+  - id: MALL-CARTDEL-FUNC-0011
+    title: "清空购物车后返回首页再进入购物车，验证状态一致"
+    module: "电商系统 → 购物车模块 → 删除记录"
+    story: "删除记录"
+    priority: P2
+    tags: [delete, ui]
+    account: primary
+    precondition: "已登录；购物车已清空"
+    input: "cart.html → HOME → CART 往返"
+    remark: "验证前端状态与服务端数据在页面切换后一致"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: open_cart
+        expect_rows: 0
+      - action: open_site
+      - action: open_cart
+        expect_rows: 0
+      - action: assert_cart_empty
+      - action: add_to_cart_api
+        product: ${p_macbook_air}
+      - action: open_cart
+        expect_rows: 1
+        desc: "加购新商品后购物车可正常展示，状态未卡死"
+
+  - id: MALL-CARTDEL-FUNC-0012
+    title: "断网状态下点击 Delete，验证异常场景下不产生假删除"
+    module: "电商系统 → 购物车模块 → 删除记录"
+    story: "删除记录"
+    priority: P2
+    tags: [delete, exception]
+    account: primary
+    precondition: "已登录；购物车含 1 条记录；页面已加载"
+    input: "浏览器网络置为 Offline 后点击 Delete"
+    remark: "核心断言：不得假删除（UI 移除但服务端未删）；当前实现为静默失败，可记 S3 体验问题"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: add_to_cart_api
+        product: ${p_macbook_air}
+      - action: open_cart
+        expect_rows: 1
+      - action: delete_with_offline
+        desc: "切离线后点击 Delete"
+      - action: assert_no_fake_delete
+        desc: "恢复网络刷新后，服务端数据仍为 1 条"
+
+  # ============================================================================
+  # 三、主流程（端到端）
+  # ============================================================================
+  - id: MALL-E2E-FUNC-0001
+    title: "执行登录→筛选→加购→删除完整主链路，验证主流程端到端可用"
+    module: "电商系统 → 主流程 → 登录到购物车删除"
+    story: "主流程"
+    priority: P0
+    tags: [smoke, e2e, core]
+    account: primary
+    precondition: "账号已注册；购物车为空"
+    input: "MacBook air（$700）"
+    remark: "【冒烟基线用例】建议纳入每日构建；8 个环节任一失败即中断并提缺陷"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: assert_logged_in
+      - action: select_laptops
+        expect_count: 6
+      - action: assert_category_count
+        expected: 6
+      - action: open_product_via_list
+        product: ${p_macbook_air}
+        expect_count: 6
+        desc: "从列表点击进入详情，验证列表跳转"
+      - action: assert_url_contains
+        part: "idp_=11"
+      - action: assert_product_detail
+        product: ${p_macbook_air}
+      - action: add_to_cart
+        product: ${p_macbook_air}
+      - action: assert_add_success
+      - action: open_cart
+        expect_rows: 1
+      - action: assert_cart_count
+        expected: 1
+      - action: assert_cart_total
+        expected: ${price_air}
+      - action: delete_first
+      - action: assert_cart_empty
+      - action: refresh_cart
+      - action: assert_cart_empty
+        desc: "刷新复核仍为空"
+
+  - id: MALL-E2E-FUNC-0002
+    title: "加购后刷新详情页再进入购物车，验证中途刷新可继续操作"
+    module: "电商系统 → 主流程 → 登录到购物车删除"
+    story: "主流程"
+    priority: P0
+    tags: [smoke, e2e, persistence]
+    account: primary
+    precondition: "已登录；购物车为空"
+    input: "MacBook air（$700）"
+    remark: "验证加购已落库，刷新后不依赖页面内存态"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: open_product
+        product: ${p_macbook_air}
+      - action: add_to_cart
+        product: ${p_macbook_air}
+      - action: assert_add_success
+      - action: open_product
+        product: ${p_macbook_air}
+        desc: "重新打开详情页（相当于刷新）"
+      - action: assert_product_detail
+        product: ${p_macbook_air}
+      - action: open_cart
+        expect_rows: 1
+      - action: assert_cart_total
+        expected: ${price_air}
+      - action: delete_first
+      - action: assert_cart_empty
+
+  - id: MALL-E2E-FUNC-0003
+    title: "未登录状态完成分类→加购→购物车→删除全链路，验证游客流程可用"
+    module: "电商系统 → 主流程 → 登录到购物车删除"
+    story: "主流程"
+    priority: P1
+    tags: [e2e, guest]
+    account: guest
+    precondition: "浏览器无 Cookie，游客态；购物车为空"
+    input: "Sony vaio i5（$790）"
+    remark: "游客数据按 document.cookie 归属；若需求要求加购必登录，应改为跳转登录页的断言"
+    steps:
+      - action: open_site
+      - action: assert_guest
+      - action: select_laptops
+        expect_count: 6
+      - action: open_product_via_list
+        product: ${p_sony_i5}
+      - action: add_to_cart
+        product: ${p_sony_i5}
+      - action: assert_add_success
+        guest: true
+      - action: open_cart
+        expect_rows: 1
+      - action: assert_cart_total
+        expected: ${price_sony}
+      - action: delete_first
+      - action: assert_cart_empty
+
+  - id: MALL-E2E-FUNC-0004
+    title: "加购后清除登录 Cookie 再访问购物车，验证登录态失效处理"
+    module: "电商系统 → 主流程 → 登录到购物车删除"
+    story: "主流程"
+    priority: P1
+    tags: [e2e, session]
+    account: primary
+    precondition: "已登录；购物车含 MacBook air 1 条"
+    input: "删除 tokenp_ Cookie 后访问 cart.html"
+    remark: "重点观察是否出现假登录态或串号"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: add_to_cart_api
+        product: ${p_macbook_air}
+      - action: clear_auth_cookie
+        desc: "删除 tokenp_ Cookie"
+      - action: open_cart
+        expect_rows: 0
+        desc: "登录态失效后不应展示原账号购物车"
+      - action: assert_cart_empty
+
+  - id: MALL-E2E-FUNC-0005
+    title: "加购三件不同商品后删除两件，验证剩余数据与金额准确"
+    module: "电商系统 → 主流程 → 登录到购物车删除"
+    story: "主流程"
+    priority: P0
+    tags: [smoke, e2e, amount]
+    account: primary
+    precondition: "已登录；购物车为空"
+    input: "MacBook air（700）+ MacBook Pro（1100）+ Dell i7 8gb（700）= 2500"
+    remark: "多商品组合可有效暴露金额重算与索引错位类缺陷"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: add_products
+        products: ["${p_macbook_air}", "${p_macbook_pro}", "${p_dell_8gb}"]
+      - action: open_cart
+        expect_rows: 3
+      - action: assert_cart_total
+        expected: 2500
+      - action: delete_by_title
+        title: "MacBook Pro"
+      - action: assert_cart_total
+        expected: 1400
+      - action: delete_by_title
+        title: "Dell i7 8gb"
+      - action: assert_cart_count
+        expected: 1
+      - action: assert_cart_titles
+        expected: ["MacBook air"]
+      - action: assert_cart_total
+        expected: 700
+      - action: refresh_cart
+      - action: assert_cart_count
+        expected: 1
+        desc: "刷新后仍剩 1 条"
+
+  - id: MALL-E2E-FUNC-0006
+    title: "购物车删除后使用浏览器前进后退，验证页面状态与数据一致"
+    module: "电商系统 → 主流程 → 登录到购物车删除"
+    story: "主流程"
+    priority: P2
+    tags: [e2e, ui]
+    account: primary
+    precondition: "已登录；购物车含 2 条记录，已删除其中 1 条"
+    input: "cart.html → 后退 → 前进"
+    remark: "单页应用常见缓存问题，需确认已删记录不会复活"
+    steps:
+      - action: open_site
+      - action: ensure_login
+      - action: api_clear_cart
+      - action: add_products
+        products: ["${p_macbook_air}", "${p_macbook_pro}"]
+      - action: open_cart
+        expect_rows: 2
+      - action: delete_first
+      - action: assert_cart_count
+        expected: 1
+      - action: browser_back_forward
+        desc: "后退再前进"
+      - action: assert_cart_count
+        expected: 1
+        desc: "状态与数据一致，已删记录不复活"
